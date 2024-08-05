@@ -909,6 +909,7 @@ sub send_files_with_s3($$$$$$)
 		foreach my $file (@{$ra_files}) {
 			chomp $file;
 			my @splits = $file;
+			my @splits_to_clean = ();
 			if( stat($file)->size > $g_s3max_size ) {
 				my $split_prefix = "$file-split-";
 				my $cmd = "$split -b $g_s3max_size $file $split_prefix";
@@ -917,6 +918,7 @@ sub send_files_with_s3($$$$$$)
 					next;
 				} else {
 					@splits = glob("$split_prefix*");
+					@splits_to_clean = @splits;
 				}
 			}
 
@@ -932,11 +934,15 @@ sub send_files_with_s3($$$$$$)
 					{
 						content_type => "application/binary"
 					}
-				);
+				) or die $s3->err . ": " . $s3->errstr;
 				$uploaded{$filename} = $file_length;
 			}
-            # For the S3 method, we assume success in any case.
-            appendto_uploaded_archives($file, $host);
+			# For the S3 method, we assume success in any case.
+			appendto_uploaded_archives($file, $host);
+
+			for my $split (@splits_to_clean) {
+				unlink($split);
+			}
 		}
 
 		# get a list of files and confirm uploads
